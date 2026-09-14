@@ -1,0 +1,149 @@
+// Схема БД — соответствует разделу 5 плана архитектуры, упрощена под текущий этап
+// (без Warehouse/Organization/многоуровневых цен — см. принятые решения, раздел 11).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  customer
+  manager
+  admin
+}
+
+// Покупатель или сотрудник (менеджер/администратор) — одна таблица с ролью,
+// отдельного контура для B2B/внешних организаций нет (см. раздел 11 плана).
+// Регистрация — по email ИЛИ телефону (хотя бы одно обязательно, проверяется
+// в AuthService), без подтверждения письмом/смс — упрощение для этого этапа.
+model User {
+  id           String   @id @default(cuid())
+  email        String?  @unique
+  phone        String?  @unique
+  passwordHash String
+  name         String?
+  role         UserRole @default(customer)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  orders       Order[]
+
+  @@map("users")
+}
+
+model Category {
+  slug     String    @id
+  name     String
+  // Ключ иконки Lucide (см. lib/icon-map.ts на фронте), например "BatteryCharging".
+  icon     String
+  // Подпункты для всплывающего списка на витрине — временное решение до реальных подкатегорий.
+  items    String[]
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  slug          String      @id
+  name          String
+  // Совместимость как отображается на карточке (свободный текст, как раньше) —
+  // например "iPhone 12 / 12 Pro". Для фильтра по модели устройства используется
+  // отдельная связь compatibilityModels (см. CompatibilityModel ниже); это поле
+  // не заменяется, просто перестаёт быть единственным источником данных о совместимости.
+  compatibility String
+  price         Int
+  oldPrice      Int?
+  badge         String?
+  description   String
+  // Характеристики товара: [{ label, value }, ...]
+  specs         Json
+  category      Category    @relation(fields: [categorySlug], references: [slug])
+  categorySlug  String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  orderItems    OrderItem[]
+  compatibilityModels ProductCompatibility[]
+
+  @@index([categorySlug])
+  @@map("products")
+}
+
+// Модель устройства (производитель/серия/модель) для фильтра "Совместимость" в
+// поиске и на странице раздела — см. раздел 2.1 и раздел 5 плана архитектуры.
+// Заполняется по общепринятой номенклатуре рынка (это не авторский контент).
+model CompatibilityModel {
+  slug     String                 @id
+  brand    String
+  series   String?
+  model    String
+  products ProductCompatibility[]
+
+  @@index([brand])
+  @@map("compatibility_models")
+}
+
+// Связь товара с моделями устройств, с которыми он совместим (многие-ко-многим).
+// Сделана явной таблицей (а не implicit m2m), чтобы можно было расширить полями
+// позже (например, "рекомендовано"/"проверено") без миграции на другую схему связи.
+model ProductCompatibility {
+  product                Product            @relation(fields: [productSlug], references: [slug], onDelete: Cascade)
+  productSlug            String
+  compatibilityModel     CompatibilityModel @relation(fields: [compatibilityModelSlug], references: [slug], onDelete: Cascade)
+  compatibilityModelSlug String
+
+  @@id([productSlug, compatibilityModelSlug])
+  @@index([compatibilityModelSlug])
+  @@map("product_compatibility")
+}
+
+// Заказ без привязки к пользователю — авторизации ещё нет (см. раздел 10 плана,
+// этап B4/Users & Auth). Оплаты и интеграции служб доставки тоже пока нет (нет
+// подключённых аккаунтов ЮKassa/СДЭК) — заказ создаётся как заявка со статусом
+// "new", дальше менеджер связывается с покупателем сам и ведёт статус вручную.
+model Order {
+  id             String      @id @default(cuid())
+  // new -> confirmed -> done, либо cancelled в любой момент. Пока просто строка,
+  // без enum — заведём Prisma enum, когда появится админка со сменой статуса.
+  status         String      @default("new")
+  customerName   String
+  phone          String
+  email          String?
+  // "pickup" (самовывоз) | "courier" (курьер/ТК — адрес обязателен, см. DTO)
+  deliveryMethod String
+  address        String?
+  comment        String?
+  // Сумма заказа на момент оформления (сумма price * qty по позициям) —
+  // хранится отдельно, чтобы не пересчитывать задним числом при смене цен в каталоге.
+  itemsTotal     Int
+  items          OrderItem[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  // Необязательная связь с аккаунтом — оформить заказ можно и без входа
+  // (гостевой чекаут сохранён сознательно), но если покупатель вошёл, его
+  // заказ попадает в личный кабинет (GET /users/me/orders).
+  user           User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId         String?
+
+  @@index([userId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  order       Order   @relation(fields: [orderId], references: [id])
+  orderId     String
+  // Связь с товаром необязательная (SetNull) — заказ должен остаться читаемым,
+  // даже если товар потом удалят из каталога.
+  product     Product? @relation(fields: [productSlug], references: [slug], onDelete: SetNull)
+  productSlug String?
+  // Название и цена — снимок на момент заказа, не текущие значения из каталога.
+  name        String
+  price       Int
+  qty         Int
+
+  @@index([orderId])
+  @@map("order_items")
+}

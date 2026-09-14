@@ -1,0 +1,26 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: storefront-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: storefront
+      POSTGRES_PASSWORD: storefront
+      POSTGRES_DB: storefront
+    ports:
+      - "5432:5432"
+    volumes:
+      - storefront-db-data:/var/lib/postgresql/data
+
+  # Веб-интерфейс для просмотра таблиц в браузере — не обязателен, но удобен, пока нет админки.
+  adminer:
+    image: adminer:latest
+    container_name: storefront-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+
+volumes:
+  storefront-db-data:
