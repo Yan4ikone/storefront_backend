@@ -9,6 +9,11 @@ FROM node:20-slim
 
 WORKDIR /app
 
+# Prisma-движок на этапе выполнения ищет системный libssl/OpenSSL — в базовом
+# образе node:20-slim (Debian) он не установлен по умолчанию, из-за чего
+# Prisma не может определить версию OpenSSL и падает/ругается в логах.
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
 # Копируем всё сразу — проект небольшой, дополнительное кэширование слоёв
 # по package.json отдельно не даёт ощутимого выигрыша, а усложняет Dockerfile.
 COPY . .
