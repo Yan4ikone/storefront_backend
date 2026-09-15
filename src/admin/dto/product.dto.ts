@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
@@ -52,6 +53,12 @@ export class CreateProductDto {
   @IsString()
   badge?: string;
 
+  // Внутренний код товара — необязателен (не у всех товаров сразу есть артикул),
+  // но если задан, должен быть уникальным (см. schema.prisma @unique).
+  @IsOptional()
+  @IsString()
+  article?: string;
+
   @IsString()
   description!: string;
 
@@ -59,6 +66,12 @@ export class CreateProductDto {
   @ValidateNested({ each: true })
   @Type(() => SpecItemDto)
   specs!: SpecItemDto[];
+
+  // "В наличии" (true) / "под заказ" (false). Не задано в запросе — берётся
+  // значение по умолчанию из schema.prisma (true).
+  @IsOptional()
+  @IsBoolean()
+  inStock?: boolean;
 
   // slug'и моделей устройств (CompatibilityModel) для фильтра "Совместимость" —
   // список актуальных значений отдаёт GET /catalog/compatibility. Необязательное
@@ -99,6 +112,10 @@ export class UpdateProductDto {
 
   @IsOptional()
   @IsString()
+  article?: string;
+
+  @IsOptional()
+  @IsString()
   description?: string;
 
   @IsOptional()
@@ -106,6 +123,10 @@ export class UpdateProductDto {
   @ValidateNested({ each: true })
   @Type(() => SpecItemDto)
   specs?: SpecItemDto[];
+
+  @IsOptional()
+  @IsBoolean()
+  inStock?: boolean;
 
   // Полностью заменяет набор моделей устройств товара (не задано в запросе —
   // текущие связи не трогаются; пустой массив — снять все).

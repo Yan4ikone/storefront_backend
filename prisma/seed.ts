@@ -95,8 +95,14 @@ interface SeedProduct {
   price: number;
   oldPrice?: number;
   badge?: string;
+  // Условный внутренний код (не привязан к реальному прайс-листу поставщика —
+  // см. комментарий в schema.prisma). Схема: <категория>-<номер>.
+  article?: string;
   description: string;
   specs: { label: string; value: string }[];
+  // Не задано — считается true (см. @default(true) в schema.prisma). false —
+  // для демонстрации бейджа "Под заказ" на нескольких товарах.
+  inStock?: boolean;
   // Slug'и из compatibilityModels выше — с какими моделями устройств связать товар
   // (для фильтра). Не задано/пусто — товар универсальный, в фильтр по модели не попадает.
   compatibilityModelSlugs?: string[];
@@ -111,6 +117,7 @@ const products: SeedProduct[] = [
     compatibility: "iPhone XR",
     price: 1190,
     badge: "Хит",
+    article: "BAT-001",
     description:
       "Аккумулятор для замены штатной батареи. Совместим с iPhone XR, поддерживает корректное отображение износа в системе.",
     compatibilityModelSlugs: ["iphone-xr"],
@@ -127,6 +134,7 @@ const products: SeedProduct[] = [
     categorySlug: "batteries",
     compatibility: "Samsung Galaxy A53",
     price: 1390,
+    article: "BAT-002",
     description: "Аккумулятор для Samsung Galaxy A53 с заводскими параметрами ёмкости.",
     compatibilityModelSlugs: ["galaxy-a53"],
     specs: [
@@ -144,6 +152,7 @@ const products: SeedProduct[] = [
     price: 1590,
     oldPrice: 1890,
     badge: "Новинка",
+    article: "BAT-003",
     description: "Батарея с увеличенной ёмкостью для моделей, где важна автономность.",
     specs: [
       { label: "Ёмкость", value: "до +20% к оригиналу" },
@@ -161,6 +170,7 @@ const products: SeedProduct[] = [
     price: 6490,
     oldPrice: 7290,
     badge: "Хит",
+    article: "DIS-001",
     description:
       "Дисплейный модуль в сборе с тачскрином для iPhone 13. Проверяется перед отправкой в отделе контроля качества.",
     compatibilityModelSlugs: ["iphone-13"],
@@ -177,6 +187,7 @@ const products: SeedProduct[] = [
     categorySlug: "displays",
     compatibility: "Samsung Galaxy A53",
     price: 5290,
+    article: "DIS-002",
     description: "OLED-дисплей в сборе с рамкой для Samsung Galaxy A53.",
     compatibilityModelSlugs: ["galaxy-a53"],
     specs: [
@@ -192,7 +203,10 @@ const products: SeedProduct[] = [
     compatibility: "Xiaomi Redmi Note 11",
     price: 3190,
     badge: "Новинка",
+    article: "DIS-003",
     description: "Дисплейный модуль для Xiaomi Redmi Note 11, IPS-матрица.",
+    // Для демонстрации бейджа "Под заказ" на витрине.
+    inStock: false,
     compatibilityModelSlugs: ["redmi-note-11"],
     specs: [
       { label: "Совместимость", value: "Xiaomi Redmi Note 11" },
@@ -208,6 +222,7 @@ const products: SeedProduct[] = [
     categorySlug: "parts",
     compatibility: "iPhone 11",
     price: 890,
+    article: "PRT-001",
     description: "Шлейф с разъёмом Lightning и микрофоном для iPhone 11.",
     compatibilityModelSlugs: ["iphone-11"],
     specs: [
@@ -222,6 +237,7 @@ const products: SeedProduct[] = [
     categorySlug: "parts",
     compatibility: "iPhone 12",
     price: 1990,
+    article: "PRT-002",
     description: "Модуль основной камеры для iPhone 12.",
     compatibilityModelSlugs: ["iphone-12"],
     specs: [
@@ -236,6 +252,7 @@ const products: SeedProduct[] = [
     categorySlug: "parts",
     compatibility: "Samsung Galaxy S21",
     price: 690,
+    article: "PRT-003",
     description: "Соединительный шлейф материнской платы для Samsung Galaxy S21.",
     compatibilityModelSlugs: ["galaxy-s21"],
     specs: [
@@ -252,6 +269,7 @@ const products: SeedProduct[] = [
     compatibility: "Универсальное (по модели)",
     price: 190,
     badge: "Новинка",
+    article: "GLS-001",
     description: "Закалённое защитное стекло 2.5D с олеофобным покрытием.",
     specs: [
       { label: "Тип", value: "2.5D" },
@@ -264,6 +282,7 @@ const products: SeedProduct[] = [
     categorySlug: "glass",
     compatibility: "iPhone 13",
     price: 350,
+    article: "GLS-002",
     description: "Полноклеевое стекло с чёрной рамкой для iPhone 13.",
     compatibilityModelSlugs: ["iphone-13"],
     specs: [
@@ -278,6 +297,7 @@ const products: SeedProduct[] = [
     categorySlug: "glass",
     compatibility: "Универсальная (по размеру)",
     price: 150,
+    article: "GLS-003",
     description: "Гидрогелевая защитная плёнка на экран, самовосстанавливающаяся.",
     specs: [{ label: "Тип", value: "Гидрогель" }],
   },
@@ -289,6 +309,7 @@ const products: SeedProduct[] = [
     categorySlug: "housings",
     compatibility: "Xiaomi Redmi Note 11",
     price: 990,
+    article: "HSG-001",
     description: "Задняя крышка корпуса для Xiaomi Redmi Note 11.",
     compatibilityModelSlugs: ["redmi-note-11"],
     specs: [{ label: "Совместимость", value: "Xiaomi Redmi Note 11" }],
@@ -299,6 +320,7 @@ const products: SeedProduct[] = [
     categorySlug: "housings",
     compatibility: "iPhone XR",
     price: 590,
+    article: "HSG-002",
     description: "Средняя рамка корпуса для iPhone XR.",
     compatibilityModelSlugs: ["iphone-xr"],
     specs: [{ label: "Совместимость", value: "iPhone XR" }],
@@ -309,6 +331,7 @@ const products: SeedProduct[] = [
     categorySlug: "housings",
     compatibility: "Универсальный (по модели)",
     price: 290,
+    article: "HSG-003",
     description: "Комплект проклеечных скотчей для сборки корпуса после ремонта.",
     specs: [{ label: "Комплектация", value: "Скотч дисплея + скотч батареи" }],
   },
@@ -321,6 +344,7 @@ const products: SeedProduct[] = [
     compatibility: "Универсальный",
     price: 1790,
     oldPrice: 2190,
+    article: "ACC-001",
     description: "Портативный аккумулятор 10000 мАч с двумя портами USB.",
     specs: [
       { label: "Ёмкость", value: "10000 мАч" },
@@ -333,6 +357,7 @@ const products: SeedProduct[] = [
     categorySlug: "accessories",
     compatibility: "Универсальные (3.5 мм / USB-C)",
     price: 490,
+    article: "ACC-002",
     description: "Проводные наушники с микрофоном, разъём на выбор при заказе.",
     specs: [{ label: "Разъём", value: "3.5 мм или USB-C" }],
   },
@@ -342,6 +367,7 @@ const products: SeedProduct[] = [
     categorySlug: "accessories",
     compatibility: "Универсальный",
     price: 290,
+    article: "ACC-003",
     description: "Кабель для зарядки и передачи данных USB-C, длина 1 м.",
     specs: [{ label: "Длина", value: "1 м" }],
   },
@@ -353,6 +379,7 @@ const products: SeedProduct[] = [
     categorySlug: "tools",
     compatibility: "Универсальный",
     price: 1290,
+    article: "TLS-001",
     description: "Базовый набор для разборки смартфонов: лопатки, присоска, отвёртки.",
     specs: [{ label: "Комплектация", value: "12 предметов" }],
   },
@@ -363,6 +390,7 @@ const products: SeedProduct[] = [
     compatibility: "Универсальная",
     price: 4990,
     badge: "Хит",
+    article: "TLS-002",
     description: "Компактная паяльная станция для ремонта плат.",
     specs: [{ label: "Мощность", value: "60 Вт" }],
   },
@@ -372,6 +400,7 @@ const products: SeedProduct[] = [
     categorySlug: "tools",
     compatibility: "Универсальный",
     price: 890,
+    article: "TLS-003",
     description: "Набор отвёрток для разборки корпусов смартфонов и ноутбуков.",
     specs: [{ label: "Комплектация", value: "24 биты" }],
   },
@@ -383,7 +412,10 @@ const products: SeedProduct[] = [
     categorySlug: "laptop-parts",
     compatibility: "Универсальная (по разрешению)",
     price: 4590,
+    article: "LPT-001",
     description: "Матрица для ноутбука 15.6 дюймов, разъём и разрешение уточняются по модели.",
+    // Для демонстрации бейджа "Под заказ" на витрине.
+    inStock: false,
     specs: [{ label: "Диагональ", value: "15.6″" }],
   },
   {
@@ -392,6 +424,7 @@ const products: SeedProduct[] = [
     categorySlug: "laptop-parts",
     compatibility: "Универсальная (по модели)",
     price: 1490,
+    article: "LPT-002",
     description: "Клавиатура для ноутбука, раскладка и крепление уточняются по модели.",
     specs: [{ label: "Раскладка", value: "RU/EN" }],
   },
@@ -401,6 +434,7 @@ const products: SeedProduct[] = [
     categorySlug: "laptop-parts",
     compatibility: "Универсальный (по модели)",
     price: 2990,
+    article: "LPT-003",
     description: "Аккумулятор для ноутбука, ёмкость и разъём уточняются по модели.",
     specs: [{ label: "Тип", value: "Li-Ion" }],
   },

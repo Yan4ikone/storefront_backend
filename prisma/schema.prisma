@@ -57,9 +57,18 @@ model Product {
   price         Int
   oldPrice      Int?
   badge         String?
+  // Артикул — внутренний код товара (для поиска и, в будущем, сверки с
+  // CRM/учётной системой поставщика). Пока не привязан ни к какому реальному
+  // прайс-листу — присваивается вручную в админке, схема кодов условная.
+  article       String?     @unique
   description   String
   // Характеристики товара: [{ label, value }, ...]
   specs         Json
+  // "В наличии" / "под заказ" — выставляется вручную в админке. Не связано ни
+  // с каким складским учётом или CRM: пользователь планирует со временем
+  // сверять это поле с реальной базой поставщика/CRM, но сейчас это просто
+  // ручной флаг для покупателя.
+  inStock       Boolean     @default(true)
   category      Category    @relation(fields: [categorySlug], references: [slug])
   categorySlug  String
   createdAt     DateTime    @default(now())

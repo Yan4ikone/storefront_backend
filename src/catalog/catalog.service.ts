@@ -98,8 +98,10 @@ export class CatalogService {
   // делаем это в два шага: сырым SQL находим slug'и в нужном порядке, а затем
   // обычным findMany подтягиваем полные объекты (с include) и восстанавливаем порядок.
   private async searchProducts(q: string, query: QueryProductsDto) {
+    // COALESCE(p.article, '') — артикул есть не у всех товаров (nullable),
+    // конкатенация NULL || строка дала бы NULL и товар выпал бы из индекса.
     const conditions: Prisma.Sql[] = [
-      Prisma.sql`to_tsvector('russian', p.name || ' ' || p.description || ' ' || p.compatibility) @@ plainto_tsquery('russian', ${q})`,
+      Prisma.sql`to_tsvector('russian', p.name || ' ' || p.description || ' ' || p.compatibility || ' ' || COALESCE(p.article, '')) @@ plainto_tsquery('russian', ${q})`,
     ];
     if (query.category) {
       conditions.push(Prisma.sql`p."categorySlug" = ${query.category}`);
@@ -125,7 +127,7 @@ export class CatalogService {
         ? Prisma.sql`p.price ASC`
         : query.sort === "price_desc"
           ? Prisma.sql`p.price DESC`
-          : Prisma.sql`ts_rank_cd(to_tsvector('russian', p.name || ' ' || p.description || ' ' || p.compatibility), plainto_tsquery('russian', ${q})) DESC`;
+          : Prisma.sql`ts_rank_cd(to_tsvector('russian', p.name || ' ' || p.description || ' ' || p.compatibility || ' ' || COALESCE(p.article, '')), plainto_tsquery('russian', ${q})) DESC`;
 
     const rows = await this.prisma.$queryRaw<{ slug: string }[]>(
       Prisma.sql`SELECT p.slug FROM products p WHERE ${Prisma.join(conditions, " AND ")} ORDER BY ${orderBy} LIMIT 200`
