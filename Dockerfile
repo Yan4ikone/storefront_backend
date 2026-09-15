@@ -31,4 +31,7 @@ EXPOSE 3001
 
 # migrate deploy безопасно выполнять при каждом запуске контейнера — он только
 # накатывает ещё не применённые миграции и ничего не удаляет (см. README).
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+# Точка входа — dist/src/main.js, а не dist/main.js: в tsconfig.json не задан
+# rootDir, поэтому tsc/nest build сохраняет структуру папок и кладёт всё под
+# dist/<sourceRoot> (sourceRoot = "src" в nest-cli.json).
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main"]
