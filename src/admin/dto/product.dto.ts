@@ -73,6 +73,12 @@ export class CreateProductDto {
   @IsBoolean()
   inStock?: boolean;
 
+  // Ожидаемый срок/дата поступления — свободный текст, имеет смысл прежде всего
+  // при inStock=false, но жёстко с ним не связан.
+  @IsOptional()
+  @IsString()
+  expectedDelivery?: string;
+
   // slug'и моделей устройств (CompatibilityModel) для фильтра "Совместимость" —
   // список актуальных значений отдаёт GET /catalog/compatibility. Необязательное
   // поле: без него товар считается универсальным (не привязан ни к одной модели).
@@ -127,6 +133,12 @@ export class UpdateProductDto {
   @IsOptional()
   @IsBoolean()
   inStock?: boolean;
+
+  // Ожидаемый срок/дата поступления — свободный текст, имеет смысл прежде всего
+  // при inStock=false, но жёстко с ним не связан.
+  @IsOptional()
+  @IsString()
+  expectedDelivery?: string;
 
   // Полностью заменяет набор моделей устройств товара (не задано в запросе —
   // текущие связи не трогаются; пустой массив — снять все).

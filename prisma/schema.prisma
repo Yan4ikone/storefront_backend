@@ -69,6 +69,11 @@ model Product {
   // сверять это поле с реальной базой поставщика/CRM, но сейчас это просто
   // ручной флаг для покупателя.
   inStock       Boolean     @default(true)
+  // Ожидаемый срок/дата поступления — свободный редактируемый текст (например
+  // "20.09" или "5-7 дней"), задаётся вручную в админке. Практический смысл
+  // имеет прежде всего для товаров "под заказ" (inStock = false), но поле не
+  // связано с inStock жёстко и не привязано к реальной логистике/поставщику.
+  expectedDelivery String?
   category      Category    @relation(fields: [categorySlug], references: [slug])
   categorySlug  String
   createdAt     DateTime    @default(now())
