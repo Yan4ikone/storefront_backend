@@ -21,17 +21,39 @@ enum UserRole {
 // Регистрация — по email ИЛИ телефону (хотя бы одно обязательно, проверяется
 // в AuthService), без подтверждения письмом/смс — упрощение для этого этапа.
 model User {
-  id           String   @id @default(cuid())
-  email        String?  @unique
-  phone        String?  @unique
+  id           String     @id @default(cuid())
+  email        String?    @unique
+  phone        String?    @unique
   passwordHash String
   name         String?
-  role         UserRole @default(customer)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  role         UserRole   @default(customer)
+  // Баланс в рублях — пока просто витрина/заглушка (правка от пользователя):
+  // отображается в профиле, меняет его вручную только админ (PATCH
+  // /admin/users/:id/balance). Кнопка "Пополнить" на фронте ничего не списывает
+  // по-настоящему — реальное пополнение подключится вместе с платёжным
+  // провайдером (раздел 8 плана), тогда это поле станет итогом реальных платежей.
+  balance      Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
   orders       Order[]
+  favorites    Favorite[]
 
   @@map("users")
+}
+
+// Избранное ("сердечко" на карточке товара) — простая связка пользователь/товар.
+// Если товар удаляют из каталога — его закладки у всех тоже исчезают (Cascade),
+// это нормально: ссылаться на несуществующий товар в избранном смысла нет.
+model Favorite {
+  id          String   @id @default(cuid())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  product     Product  @relation(fields: [productSlug], references: [slug], onDelete: Cascade)
+  productSlug String
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, productSlug])
+  @@map("favorites")
 }
 
 model Category {
@@ -74,12 +96,19 @@ model Product {
   // имеет прежде всего для товаров "под заказ" (inStock = false), но поле не
   // связано с inStock жёстко и не привязано к реальной логистике/поставщику.
   expectedDelivery String?
+  // Фото товара — пути к уже обрезанным/отресайзенным файлам (см.
+  // AdminCatalogService.uploadImage), в порядке добавления; первое — обложка
+  // карточки. Пока хранится на диске самого бэкенда (backend/uploads) — при
+  // переезде на Timeweb Object Storage поменяется только то, что пишется в
+  // этот массив (сами пути), не сама модель данных.
+  images        String[]    @default([])
   category      Category    @relation(fields: [categorySlug], references: [slug])
   categorySlug  String
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   orderItems    OrderItem[]
   compatibilityModels ProductCompatibility[]
+  favoritedBy   Favorite[]
 
   @@index([categorySlug])
   @@map("products")
@@ -113,15 +142,33 @@ model ProductCompatibility {
   @@map("product_compatibility")
 }
 
+// new -> confirmed -> assembled -> shipped -> delivered — линейный прогресс,
+// показывается покупателю как линия с точками (см. storefront OrderProgress).
+// cancelled — отдельно, вне линии, в любой момент (см. Order.cancellationRequested).
+enum OrderStatus {
+  new
+  confirmed
+  assembled
+  shipped
+  delivered
+  cancelled
+}
+
 // Заказ без привязки к пользователю — авторизации ещё нет (см. раздел 10 плана,
 // этап B4/Users & Auth). Оплаты и интеграции служб доставки тоже пока нет (нет
 // подключённых аккаунтов ЮKassa/СДЭК) — заказ создаётся как заявка со статусом
 // "new", дальше менеджер связывается с покупателем сам и ведёт статус вручную.
 model Order {
   id             String      @id @default(cuid())
-  // new -> confirmed -> done, либо cancelled в любой момент. Пока просто строка,
-  // без enum — заведём Prisma enum, когда появится админка со сменой статуса.
-  status         String      @default("new")
+  // Короткий номер для разговора с покупателем/поиска среди тысячи заказов
+  // ("назовите, пожалуйста, номер заказа") — отдельно от непрозрачного id.
+  number         Int         @unique @default(autoincrement())
+  status         OrderStatus @default(new)
+  // Покупатель попросил отменить уже подтверждённый (не "новый") заказ — сам
+  // заказ остаётся в текущем статусе, пока менеджер/админ не подтвердит отмену
+  // (см. OrdersService.cancel). Для "новых" заказов отмена покупателем удаляет
+  // заказ сразу, без этого флага.
+  cancellationRequested Boolean @default(false)
   customerName   String
   phone          String
   email          String?
@@ -140,8 +187,14 @@ model Order {
   // заказ попадает в личный кабинет (GET /users/me/orders).
   user           User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
   userId         String?
+  // Если при оформлении покупатель выбрал "раздельно" для товаров в наличии и
+  // "под заказ" — оба получившихся заказа получают один и тот же groupId,
+  // чтобы на странице подтверждения и в истории было видно, что это части
+  // одной покупки. У обычного (нераздельного) заказа — null.
+  groupId        String?
 
   @@index([userId])
+  @@index([groupId])
   @@map("orders")
 }
 
@@ -153,10 +206,12 @@ model OrderItem {
   // даже если товар потом удалят из каталога.
   product     Product? @relation(fields: [productSlug], references: [slug], onDelete: SetNull)
   productSlug String?
-  // Название и цена — снимок на момент заказа, не текущие значения из каталога.
+  // Название, цена и наличие — снимок на момент заказа, не текущие значения из
+  // каталога (товар мог после заказа изменить цену или появиться на складе).
   name        String
   price       Int
   qty         Int
+  inStock     Boolean @default(true)
 
   @@index([orderId])
   @@map("order_items")

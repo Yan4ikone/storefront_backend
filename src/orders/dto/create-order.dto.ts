@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsEmail,
   IsIn,
   IsInt,
@@ -50,4 +51,12 @@ export class CreateOrderDto {
   @ValidateNested({ each: true })
   @Type(() => CreateOrderItemDto)
   items!: CreateOrderItemDto[];
+
+  // Покупатель явно попросил оформить "в наличии" и "под заказ" раздельно
+  // (двумя заказами со счётом-привязкой groupId), а не одним общим заказом.
+  // Если в корзине товары только одного типа — флаг ни на что не влияет,
+  // заказ создаётся один в любом случае (см. OrdersService.create).
+  @IsOptional()
+  @IsBoolean()
+  splitByAvailability?: boolean;
 }

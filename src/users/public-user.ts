@@ -8,6 +8,9 @@ export interface PublicUser {
   phone: string | null;
   name: string | null;
   role: string;
+  // Пока только отображение + ручная правка админом (см. комментарий у
+  // User.balance в schema.prisma) — не связан ни с каким платёжным сервисом.
+  balance: number;
   createdAt: Date;
 }
 

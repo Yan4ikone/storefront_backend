@@ -1,4 +1,19 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  MaxFileSizeValidator,
+  Param,
+  ParseFilePipe,
+  Patch,
+  Post,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { memoryStorage } from "multer";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { RolesGuard } from "../auth/roles.guard";
 import { Roles } from "../auth/roles.decorator";
@@ -55,5 +70,24 @@ export class AdminCatalogController {
   @Delete("products/:slug")
   deleteProduct(@Param("slug") slug: string) {
     return this.adminCatalogService.deleteProduct(slug);
+  }
+
+  // Фото товара — файл приходит как multipart/form-data, поле "file". Храним
+  // в памяти (не на диск multer'ом), потому что всё равно пересжимаем через
+  // sharp (см. AdminCatalogService.addProductImage) — исходный файл на диск
+  // писать не нужно.
+  @Post("products/:slug/images")
+  @UseInterceptors(FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } }))
+  uploadImage(
+    @Param("slug") slug: string,
+    @UploadedFile(new ParseFilePipe({ validators: [new MaxFileSizeValidator({ maxSize: 8 * 1024 * 1024 })] }))
+    file: Express.Multer.File
+  ) {
+    return this.adminCatalogService.addProductImage(slug, file);
+  }
+
+  @Delete("products/:slug/images")
+  deleteImage(@Param("slug") slug: string, @Body("path") imagePath: string) {
+    return this.adminCatalogService.removeProductImage(slug, imagePath);
   }
 }

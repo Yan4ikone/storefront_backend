@@ -1,5 +1,8 @@
-import { Body, Controller, Get, Headers, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Param, Post, UseGuards } from "@nestjs/common";
+import type { User } from "@prisma/client";
 import { AuthService } from "../auth/auth.service";
+import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { CurrentUser } from "../auth/current-user.decorator";
 import { OrdersService } from "./orders.service";
 import { CreateOrderDto } from "./dto/create-order.dto";
 
@@ -21,8 +24,21 @@ export class OrdersController {
     return this.ordersService.create(dto, user?.id);
   }
 
+  @Get("group/:groupId")
+  findGroup(@Param("groupId") groupId: string) {
+    return this.ordersService.findByGroupId(groupId);
+  }
+
   @Get(":id")
   findOne(@Param("id") id: string) {
     return this.ordersService.findOne(id);
+  }
+
+  // Отмена заказа покупателем из личного кабинета — требует входа (у
+  // гостевых заказов нет userId, сравнить владельца было бы не с чем).
+  @UseGuards(JwtAuthGuard)
+  @Post(":id/cancel")
+  cancel(@Param("id") id: string, @CurrentUser() user: User) {
+    return this.ordersService.cancelByCustomer(id, user.id);
   }
 }

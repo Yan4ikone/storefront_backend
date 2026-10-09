@@ -1,6 +1,10 @@
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
+import * as fs from "fs";
+import * as path from "path";
+import sharp from "sharp";
 import { PrismaService } from "../prisma/prisma.service";
+import { PRODUCT_IMAGES_DIR, UPLOADS_DIR } from "../uploads.constants";
 import { CreateCategoryDto, UpdateCategoryDto } from "./dto/category.dto";
 import { CreateProductDto, UpdateProductDto } from "./dto/product.dto";
 
@@ -122,5 +126,46 @@ export class AdminCatalogService {
     await this.getProduct(slug);
     await this.prisma.product.delete({ where: { slug } });
     return { ok: true };
+  }
+
+  // --- Фото товара ---
+  // Пользователь выбрал автоматический ресайз на сервере (а не текстовую
+  // подсказку о нужном размере): что бы админ ни загрузил, получаем
+  // одинаковый квадратный webp 1200×1200 (cover-кроп по центру) — карточки
+  // и страница товара на витрине всегда показывают предсказуемый размер.
+  async addProductImage(slug: string, file: Express.Multer.File) {
+    await this.getProduct(slug);
+    await fs.promises.mkdir(PRODUCT_IMAGES_DIR, { recursive: true });
+
+    const filename = `${slug}-${Date.now()}-${Math.round(Math.random() * 1e6)}.webp`;
+    const outputPath = path.join(PRODUCT_IMAGES_DIR, filename);
+    await sharp(file.buffer)
+      .resize(1200, 1200, { fit: "cover", position: "centre" })
+      .webp({ quality: 82 })
+      .toFile(outputPath);
+
+    const publicPath = `/uploads/products/${filename}`;
+    return this.prisma.product.update({
+      where: { slug },
+      data: { images: { push: publicPath } },
+      include: { compatibilityModels: { include: { compatibilityModel: true } } },
+    });
+  }
+
+  async removeProductImage(slug: string, imagePath: string) {
+    const product = await this.getProduct(slug);
+    const images = product.images.filter((img) => img !== imagePath);
+    const updated = await this.prisma.product.update({
+      where: { slug },
+      data: { images },
+      include: { compatibilityModels: { include: { compatibilityModel: true } } },
+    });
+
+    // Сам файл с диска удаляем без блокировки ответа — если не получится
+    // (например, уже пересобрали контейнер и диск чистый), это не ошибка API.
+    const relative = imagePath.replace(/^\/uploads\//, "");
+    fs.promises.unlink(path.join(UPLOADS_DIR, relative)).catch(() => undefined);
+
+    return updated;
   }
 }
