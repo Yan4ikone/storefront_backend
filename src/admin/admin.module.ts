@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { OrdersModule } from "../orders/orders.module";
+import { S3StorageService } from "../s3.service";
 import { AdminController } from "./admin.controller";
 import { AdminCatalogController } from "./admin-catalog.controller";
 import { AdminCatalogService } from "./admin-catalog.service";
@@ -18,6 +19,6 @@ import { AdminUsersService } from "./admin-users.service";
     AdminReportsController,
     AdminUsersController,
   ],
-  providers: [AdminCatalogService, AdminReportsService, AdminUsersService],
+  providers: [AdminCatalogService, AdminReportsService, AdminUsersService, S3StorageService],
 })
 export class AdminModule {}

@@ -4,13 +4,17 @@ import * as fs from "fs";
 import * as path from "path";
 import sharp from "sharp";
 import { PrismaService } from "../prisma/prisma.service";
-import { PRODUCT_IMAGES_DIR, UPLOADS_DIR } from "../uploads.constants";
+import { S3StorageService } from "../s3.service";
+import { UPLOADS_DIR } from "../uploads.constants";
 import { CreateCategoryDto, UpdateCategoryDto } from "./dto/category.dto";
 import { CreateProductDto, UpdateProductDto } from "./dto/product.dto";
 
 @Injectable()
 export class AdminCatalogService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly s3: S3StorageService
+  ) {}
 
   // --- Категории ---
 
@@ -133,21 +137,24 @@ export class AdminCatalogService {
   // подсказку о нужном размере): что бы админ ни загрузил, получаем
   // одинаковый квадратный webp 1200×1200 (cover-кроп по центру) — карточки
   // и страница товара на витрине всегда показывают предсказуемый размер.
+  //
+  // Файл заливается в Timeweb S3 (см. S3StorageService), а не на локальный
+  // диск контейнера — диск App Platform не переживает передеплой backend
+  // (см. claude/arhitektura-i-plan.md, раздел 9). В Product.images хранится
+  // сразу полный публичный https-адрес объекта в бакете.
   async addProductImage(slug: string, file: Express.Multer.File) {
     await this.getProduct(slug);
-    await fs.promises.mkdir(PRODUCT_IMAGES_DIR, { recursive: true });
 
     const filename = `${slug}-${Date.now()}-${Math.round(Math.random() * 1e6)}.webp`;
-    const outputPath = path.join(PRODUCT_IMAGES_DIR, filename);
-    await sharp(file.buffer)
+    const buffer = await sharp(file.buffer)
       .resize(1200, 1200, { fit: "cover", position: "centre" })
       .webp({ quality: 82 })
-      .toFile(outputPath);
+      .toBuffer();
+    const publicUrl = await this.s3.upload(`products/${filename}`, buffer, "image/webp");
 
-    const publicPath = `/uploads/products/${filename}`;
     return this.prisma.product.update({
       where: { slug },
-      data: { images: { push: publicPath } },
+      data: { images: { push: publicUrl } },
       include: { compatibilityModels: { include: { compatibilityModel: true } } },
     });
   }
@@ -161,10 +168,18 @@ export class AdminCatalogService {
       include: { compatibilityModels: { include: { compatibilityModel: true } } },
     });
 
-    // Сам файл с диска удаляем без блокировки ответа — если не получится
-    // (например, уже пересобрали контейнер и диск чистый), это не ошибка API.
-    const relative = imagePath.replace(/^\/uploads\//, "");
-    fs.promises.unlink(path.join(UPLOADS_DIR, relative)).catch(() => undefined);
+    // Удаление самого файла не блокирует ответ — если не получится, это не
+    // ошибка API. Текущие фото лежат в S3 (ключ достаём из сохранённого
+    // публичного URL); старый вариант (относительный путь на локальном
+    // диске, до перехода на S3) оставлен как запасной случай для записей,
+    // созданных раньше.
+    const key = this.s3.keyFromUrl(imagePath);
+    if (key) {
+      this.s3.delete(key).catch(() => undefined);
+    } else {
+      const relative = imagePath.replace(/^\/uploads\//, "");
+      fs.promises.unlink(path.join(UPLOADS_DIR, relative)).catch(() => undefined);
+    }
 
     return updated;
   }
