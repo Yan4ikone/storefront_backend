@@ -5,7 +5,9 @@ import type { ReportsSummary } from "./admin-reports.service";
 const STATUS_LABELS: Record<string, string> = {
   new: "Новый",
   confirmed: "Подтверждён",
-  done: "Выполнен",
+  assembled: "Собран",
+  shipped: "В пути",
+  delivered: "Доставлен",
   cancelled: "Отменён",
 };
 

@@ -1,6 +1,8 @@
 import { Injectable } from "@nestjs/common";
+import type { Order, OrderItem } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import type { ReportGroupBy } from "./dto/reports-query.dto";
+import type { OrderStatusValue } from "./dto/order-status.dto";
 
 export interface ReportPeriodRow {
   period: string;
@@ -121,7 +123,13 @@ export class AdminReportsService {
 
   // Реестр заказов за период — та же выборка, что видит /admin/orders, но с
   // фильтром по датам и статусу, для сверки бухгалтером или выгрузки в Excel.
-  getOrdersRegister(from?: string, to?: string, status?: string) {
+  // Явный тип возврата — чтобы buildOrdersWorkbookBuffer (reports-excel.util)
+  // точно видел поле items, а не то, что TS выведет сам из вызова Prisma.
+  getOrdersRegister(
+    from?: string,
+    to?: string,
+    status?: OrderStatusValue
+  ): Promise<(Order & { items: OrderItem[] })[]> {
     const { start, end } = resolveRange(from, to);
     return this.prisma.order.findMany({
       where: {

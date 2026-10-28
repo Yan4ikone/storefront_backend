@@ -1,5 +1,5 @@
 import { IsIn, IsISO8601, IsOptional } from "class-validator";
-import { ORDER_STATUSES } from "./order-status.dto";
+import { ORDER_STATUSES, type OrderStatusValue } from "./order-status.dto";
 
 // Группировка сводного отчёта по выручке — по дням, неделям (с понедельника)
 // или месяцам. День — разумный дефолт для небольшого магазина.
@@ -32,7 +32,11 @@ export class ReportsOrdersQueryDto {
   @IsISO8601()
   to?: string;
 
+  // Тип — не просто string, а тот же литеральный union, что и у Order.status
+  // в Prisma (OrderStatus); иначе дальше по цепочке (AdminReportsService ->
+  // prisma.order.findMany) TypeScript не даст передать это поле в where без
+  // приведения типа.
   @IsOptional()
   @IsIn(ORDER_STATUSES)
-  status?: string;
+  status?: OrderStatusValue;
 }
