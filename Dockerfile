@@ -4,8 +4,13 @@
 # без какой-либо возможности передать `--legacy-peer-deps` (см. лог сборки:
 # конфликт peer-зависимостей @nestjs/schematics@12 <-> typescript@5.x). Здесь
 # мы полностью сами описываем шаги сборки, поэтому флаг применяется гарантированно.
+#
+# node:22, а не 20 — часть зависимостей (@angular-devkit/schematics,
+# @angular-devkit/core, commander и т.п., подтягиваются через Nest CLI)
+# требует Node >=22.12.0 (engines), на 20-й версии npm install выдавал
+# предупреждения EBADENGINE.
 
-FROM node:20-slim
+FROM node:22-slim
 
 WORKDIR /app
 
