@@ -23,7 +23,15 @@ RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists
 # по package.json отдельно не даёт ощутимого выигрыша, а усложняет Dockerfile.
 COPY . .
 
-RUN npm install --legacy-peer-deps
+# "Взрыватель" кэша: у Timeweb App Platform этот шаг иногда брался из кэша
+# предыдущей сборки даже после изменений в package.json (см. историю чата —
+# из-за этого однажды задеплоилась версия @aws-sdk/client-s3 с багом
+# ETARGET, хотя в коммите она уже была исправлена). echo с меняющейся
+# строкой перед npm install гарантированно делает этот RUN-слой новым для
+# Docker, независимо от того, как именно платформа кэширует предыдущие шаги.
+# Если нужно принудительно сбросить кэш установки зависимостей — просто
+# поменяйте строку после "cache-bust:" на любую другую.
+RUN echo "cache-bust: 2026-10-29-01" && npm install --legacy-peer-deps
 
 # Генерирует Prisma Client (типы для @prisma/client) — без этого `nest build`
 # не скомпилируется, т.к. код импортирует сгенерированные типы.
